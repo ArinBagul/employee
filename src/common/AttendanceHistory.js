@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet } from "react-native";
-import { getFirestore, collection, query, where, getDocs } from "firebase/firestore";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  getDocs,
+} from "firebase/firestore";
 
 const AttendanceHistory = ({ userId }) => {
   const [attendanceList, setAttendanceList] = useState([]);
@@ -9,9 +15,15 @@ const AttendanceHistory = ({ userId }) => {
   useEffect(() => {
     const fetchAttendanceData = async () => {
       try {
-        const q = query(collection(db, "attendance"), where("userId", "==", userId));
+        const q = query(
+          collection(db, "attendance"),
+          where("userId", "==", userId)
+        );
         const querySnapshot = await getDocs(q);
-        const data = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const data = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
         setAttendanceList(data);
       } catch (error) {
         console.error("Error fetching attendance data:", error);
@@ -27,7 +39,9 @@ const AttendanceHistory = ({ userId }) => {
       <View style={styles.itemContainer}>
         <Text style={styles.itemText}>Date: {item.date}</Text>
         <Text style={styles.itemText}>Check In: {item.checkIn}</Text>
-        <Text style={styles.itemText}>Check Out: {item.checkOut || "Not checked out yet"}</Text>
+        <Text style={styles.itemText}>
+          Check Out: {item.checkOut || "Not checked out yet"}
+        </Text>
         <Text style={styles.itemText}>Location: {item.location}</Text>
       </View>
     );

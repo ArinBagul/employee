@@ -12,21 +12,20 @@ import {
 import { app } from "../config/firebase";
 import AttendanceHistory from "../common/AttendanceHistory";
 
-import * as Location from 'expo-location';
+import * as Location from "expo-location";
 
 const Home = () => {
   const db = getFirestore(app);
 
   const [location, setLocation] = useState(null);
-  const [address, setAddress] = useState("")
+  const [address, setAddress] = useState("");
   const [errorMsg, setErrorMsg] = useState(null);
 
   useEffect(() => {
     const getPermission = async () => {
-      
       let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setErrorMsg('Permission to access location was denied');
+      if (status !== "granted") {
+        setErrorMsg("Permission to access location was denied");
         return;
       }
 
@@ -37,21 +36,20 @@ const Home = () => {
     getPermission();
     // geoCode();
   }, []);
-  
+
   useEffect(() => {
     const geoCode = async () => {
       if (location) {
         const geoCodeLoc = await Location.reverseGeocodeAsync({
           longitude: location.coords.longitude,
-          latitude: location.coords.latitude
+          latitude: location.coords.latitude,
         });
         setAddress(geoCodeLoc[0].formattedAddress);
       }
     };
-  
+
     geoCode();
   }, [location]);
-  
 
   const [currentDate, setCurrentDate] = useState("");
   const [checkInEnable, setCheckInEnable] = useState(true);
@@ -86,7 +84,7 @@ const Home = () => {
         setCheckInEnable(false);
         setCheckOutEnable(status === "CIN");
       }
-      
+
       const eRef = doc(db, "employees", savedUserId);
       eRef.onSnapshot((snapshot) => {
         if (snapshot.exists()) {
@@ -121,13 +119,12 @@ const Home = () => {
   };
 
   const uploadCheckIn = async () => {
-
     let currentTime = new Date().getHours() + ":" + new Date().getMinutes();
     const geoCodeLoc = await Location.reverseGeocodeAsync({
-      longitude:location.coords.longitude,
-      latitude: location.coords.latitude
-    })
-    console.log(geoCodeLoc[0].formattedAddress)
+      longitude: location.coords.longitude,
+      latitude: location.coords.latitude,
+    });
+    console.log(geoCodeLoc[0].formattedAddress);
 
     const attendanceData = {
       checkIn: currentTime,
@@ -173,7 +170,7 @@ const Home = () => {
       console.error("Error updating attendance data:", error);
     }
   };
-  
+
   return (
     <View style={{ flex: 1 }}>
       <View
@@ -186,7 +183,14 @@ const Home = () => {
           paddingLeft: 20,
         }}
       >
-        <Text style={{ color: "#000", fontWeight: "700", fontSize: 16, marginTop: 20 }}>
+        <Text
+          style={{
+            color: "#000",
+            fontWeight: "700",
+            fontSize: 16,
+            marginTop: 20,
+          }}
+        >
           EmployeePro
         </Text>
       </View>

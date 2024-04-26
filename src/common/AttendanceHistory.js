@@ -22,11 +22,13 @@ const AttendanceHistory = ({ userId }) => {
   }, [db, userId]);
 
   const renderAttendanceItem = ({ item }) => {
+    console.log(item.location);
     return (
       <View style={styles.itemContainer}>
         <Text style={styles.itemText}>Date: {item.date}</Text>
         <Text style={styles.itemText}>Check In: {item.checkIn}</Text>
         <Text style={styles.itemText}>Check Out: {item.checkOut || "Not checked out yet"}</Text>
+        <Text style={styles.itemText}>Location: {item.location}</Text>
       </View>
     );
   };

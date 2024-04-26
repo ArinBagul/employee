@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity } from "react-native";
+import { Platform, View, Text, TouchableOpacity } from "react-native";
 import React, { useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -12,8 +12,46 @@ import {
 import { app } from "../config/firebase";
 import AttendanceHistory from "../common/AttendanceHistory";
 
+import * as Location from 'expo-location';
+
 const Home = () => {
   const db = getFirestore(app);
+
+  const [location, setLocation] = useState(null);
+  const [address, setAddress] = useState("")
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  useEffect(() => {
+    const getPermission = async () => {
+      
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setErrorMsg('Permission to access location was denied');
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync();
+      setLocation(location);
+    };
+
+    getPermission();
+    // geoCode();
+  }, []);
+  
+  useEffect(() => {
+    const geoCode = async () => {
+      if (location) {
+        const geoCodeLoc = await Location.reverseGeocodeAsync({
+          longitude: location.coords.longitude,
+          latitude: location.coords.latitude
+        });
+        setAddress(geoCodeLoc[0].formattedAddress);
+      }
+    };
+  
+    geoCode();
+  }, [location]);
+  
 
   const [currentDate, setCurrentDate] = useState("");
   const [checkInEnable, setCheckInEnable] = useState(true);
@@ -83,12 +121,20 @@ const Home = () => {
   };
 
   const uploadCheckIn = async () => {
+
     let currentTime = new Date().getHours() + ":" + new Date().getMinutes();
+    const geoCodeLoc = await Location.reverseGeocodeAsync({
+      longitude:location.coords.longitude,
+      latitude: location.coords.latitude
+    })
+    console.log(geoCodeLoc[0].formattedAddress)
+
     const attendanceData = {
       checkIn: currentTime,
       checkOut: "",
       date: currentDate,
       userId: userId,
+      location: geoCodeLoc[0].formattedAddress,
     };
 
     try {
@@ -127,8 +173,7 @@ const Home = () => {
       console.error("Error updating attendance data:", error);
     }
   };
-
-
+  
   return (
     <View style={{ flex: 1 }}>
       <View
@@ -156,6 +201,17 @@ const Home = () => {
         }}
       >
         {"Today Date: " + currentDate}
+      </Text>
+      <Text
+        style={{
+          fontSize: 16,
+          fontWeight: "500",
+          color: "#eb4034",
+          marginTop: 10,
+          marginLeft: 20,
+        }}
+      >
+        {"Current Location: " + address}
       </Text>
       <View
         style={{
@@ -210,6 +266,9 @@ const Home = () => {
           <Text style={{ color: "#fff" }}>Check Out</Text>
         </TouchableOpacity>
       </View>
+      {/* <TouchableOpacity onPress={()=>geoCode()}>
+        <Text>Geolocate</Text>
+      </TouchableOpacity> */}
       {/* <AttendanceHistory userId={userId} /> */}
     </View>
   );

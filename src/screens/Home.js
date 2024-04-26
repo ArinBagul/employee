@@ -1,144 +1,147 @@
-import {View, Text, TouchableOpacity} from 'react-native';
-import React, {useEffect, useState} from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import firestore from '@react-native-firebase/firestore';
-let emailId = '',
-  userId = '';
-let attendanceList = [];
+import { View, Text, TouchableOpacity } from "react-native";
+import React, { useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  getFirestore,
+  collection,
+  doc,
+  addDoc,
+  setDoc,
+  getDoc,
+} from "firebase/firestore";
+import { app } from "../config/firebase";
+import AttendanceHistory from "../common/AttendanceHistory";
+
 const Home = () => {
-  const [currentDate, setCurrentDate] = useState('');
+  const db = getFirestore(app);
+
+  const [currentDate, setCurrentDate] = useState("");
   const [checkInEnable, setCheckInEnable] = useState(true);
   const [checkOutEnable, setCheckOutEnable] = useState(false);
+  const [attendanceDocId, setAttendanceDocId] = useState(null);
+  const [userId, setUserId] = useState("");
+
   useEffect(() => {
     setCurrentDate(
       new Date().getDate() +
-        '/' +
+        "/" +
         (new Date().getMonth() + 1) +
-        '/' +
-        new Date().getFullYear(),
+        "/" +
+        new Date().getFullYear()
     );
+
+    const getSavedDate = async () => {
+      const date = await AsyncStorage.getItem("DATE");
+      const status = await AsyncStorage.getItem("STATUS");
+      const savedUserId = await AsyncStorage.getItem("USERID");
+      setUserId(savedUserId);
+
+      if (
+        date ===
+          new Date().getDate() +
+            "/" +
+            (new Date().getMonth() + 1) +
+            "/" +
+            new Date().getFullYear() &&
+        (status === "CIN" || status === "COUT")
+      ) {
+        setCheckInEnable(false);
+        setCheckOutEnable(status === "CIN");
+      }
+      
+      const eRef = doc(db, "employees", savedUserId);
+      eRef.onSnapshot((snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data && data.attendance) {
+            setAttendanceDocId(snapshot.id);
+          }
+        }
+      });
+    };
 
     getSavedDate();
-  }, []);
+  }, [userId]);
+
   const saveDate = async () => {
     await AsyncStorage.setItem(
-      'DATE',
+      "DATE",
       new Date().getDate() +
-        '/' +
+        "/" +
         (new Date().getMonth() + 1) +
-        '/' +
-        new Date().getFullYear(),
+        "/" +
+        new Date().getFullYear()
     );
   };
 
-  const getSavedDate = async () => {
-    const date = await AsyncStorage.getItem('DATE');
-    const status = await AsyncStorage.getItem('STATUS');
-    emailId = await AsyncStorage.getItem('EMAIL');
-    userId = await AsyncStorage.getItem('USERID');
-    if (
-      date ==
-        new Date().getDate() +
-          '/' +
-          (new Date().getMonth() + 1) +
-          '/' +
-          new Date().getFullYear() &&
-      status == 'CIN'
-    ) {
-      setCheckInEnable(false);
-      setCheckOutEnable(true);
-    } else if (
-      date ==
-        new Date().getDate() +
-          '/' +
-          (new Date().getMonth() + 1) +
-          '/' +
-          new Date().getFullYear() &&
-      status == 'COUT'
-    ) {
-      setCheckInEnable(false);
-      setCheckOutEnable(false);
-    }
-    console.log(date);
-    attendanceList = [];
-    firestore()
-      .collection('employees')
-      .doc(userId)
-      .onSnapshot(documentSnapshot => {
-        console.log('User data: ', documentSnapshot.data().attendance);
-        if (documentSnapshot.data().attendance !== undefined) {
-          documentSnapshot.data().attendance.map(item => {
-            attendanceList.push(item);
-          });
-        }
-      });
-  };
   const saveCheckin = async () => {
-    await AsyncStorage.setItem('STATUS', 'CIN');
+    await AsyncStorage.setItem("STATUS", "CIN");
   };
-  const saveCheckout = async () => {
-    await AsyncStorage.setItem('STATUS', 'COUT');
-  };
-  const uploadCheckIn = () => {
-    let currentTime = new Date().getHours() + ':' + new Date().getMinutes();
-    attendanceList.push({
-      checkIn: currentTime,
-      checkOut: '',
-      date: currentDate,
-    });
-    firestore()
-      .collection('employees')
-      .doc(userId)
-      .update({
-        attendance: attendanceList,
-      })
-      .then(() => {
-        console.log('User updated!');
-      });
-    attendanceList = [];
-    firestore()
-      .collection('employees')
-      .doc(userId)
-      .onSnapshot(documentSnapshot => {
-        console.log('User data: ', documentSnapshot.data().attendance);
 
-        if (documentSnapshot.data().attendance !== undefined) {
-          documentSnapshot.data().attendance.map(item => {
-            attendanceList.push(item);
-          });
-        }
-      });
+  const saveCheckout = async () => {
+    await AsyncStorage.setItem("STATUS", "COUT");
   };
-  const uploadCheckOut = () => {
-    let currentTime = new Date().getHours() + ':' + new Date().getMinutes();
-    console.log(attendanceList);
-    attendanceList[attendanceList.length - 1].checkIn =
-      attendanceList[attendanceList.length - 1].checkIn;
-    attendanceList[attendanceList.length - 1].checkOut = currentTime;
-    attendanceList[attendanceList.length - 1].date = currentDate;
-    firestore()
-      .collection('employees')
-      .doc(userId)
-      .update({
-        attendance: attendanceList,
-      })
-      .then(() => {
-        console.log('User updated!');
-      });
+
+  const uploadCheckIn = async () => {
+    let currentTime = new Date().getHours() + ":" + new Date().getMinutes();
+    const attendanceData = {
+      checkIn: currentTime,
+      checkOut: "",
+      date: currentDate,
+      userId: userId,
+    };
+
+    try {
+      const docRef = await addDoc(collection(db, "attendance"), attendanceData);
+      console.log("Attendance data added with ID:", docRef.id);
+      setAttendanceDocId(docRef.id);
+    } catch (error) {
+      console.error("Error adding attendance data:", error);
+    }
   };
+
+  const uploadCheckOut = async () => {
+    if (!attendanceDocId) {
+      console.error("Attendance document ID is missing.");
+      return;
+    }
+
+    try {
+      const attendanceRef = doc(db, "attendance", attendanceDocId);
+      const attendanceDoc = await getDoc(attendanceRef);
+
+      if (attendanceDoc.exists()) {
+        const existingAttendanceData = attendanceDoc.data();
+        const updatedAttendanceData = {
+          ...existingAttendanceData,
+          checkOut: new Date().getHours() + ":" + new Date().getMinutes(),
+        };
+
+        await setDoc(attendanceRef, updatedAttendanceData);
+
+        console.log("Attendance data updated successfully.");
+      } else {
+        console.error("Attendance document does not exist.");
+      }
+    } catch (error) {
+      console.error("Error updating attendance data:", error);
+    }
+  };
+
 
   return (
-    <View style={{flex: 1}}>
+    <View style={{ flex: 1 }}>
       <View
         style={{
-          width: '100%',
+          width: "100%",
           height: 60,
           elevation: 4,
-          backgroundColor: '#fff',
-          justifyContent: 'center',
+          backgroundColor: "#fff",
+          justifyContent: "center",
           paddingLeft: 20,
-        }}>
-        <Text style={{color: '#000', fontWeight: '700', fontSize: 16}}>
+        }}
+      >
+        <Text style={{ color: "#000", fontWeight: "700", fontSize: 16, marginTop: 20 }}>
           EmployeePro
         </Text>
       </View>
@@ -146,30 +149,32 @@ const Home = () => {
       <Text
         style={{
           fontSize: 18,
-          fontWeight: '700',
-          color: '#000',
+          fontWeight: "700",
+          color: "#000",
           marginTop: 20,
           marginLeft: 20,
-        }}>
-        {'Today Date: ' + currentDate}
+        }}
+      >
+        {"Today Date: " + currentDate}
       </Text>
       <View
         style={{
-          flexDirection: 'row',
-          width: '100%',
+          flexDirection: "row",
+          width: "100%",
           height: 60,
-          justifyContent: 'space-evenly',
-          alignItems: 'center',
-        }}>
+          justifyContent: "space-evenly",
+          alignItems: "center",
+        }}
+      >
         <TouchableOpacity
-          disabled={!checkInEnable}
+          // disabled={!checkInEnable}
           style={{
-            width: '40%',
+            width: "40%",
             height: 50,
-            backgroundColor: checkInEnable ? 'green' : 'gray',
-            justifyContent: 'center',
-            alignItems: 'center',
-            alignSelf: 'center',
+            backgroundColor: checkInEnable ? "green" : "gray",
+            justifyContent: "center",
+            alignItems: "center",
+            alignSelf: "center",
             marginTop: 50,
             borderRadius: 10,
           }}
@@ -179,18 +184,19 @@ const Home = () => {
             setCheckInEnable(false);
             setCheckOutEnable(true);
             uploadCheckIn();
-          }}>
-          <Text style={{color: '#fff'}}>Check In</Text>
+          }}
+        >
+          <Text style={{ color: "#fff" }}>Check In</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          disabled={!checkOutEnable}
+          // disabled={!checkOutEnable}
           style={{
-            width: '40%',
+            width: "40%",
             height: 50,
-            backgroundColor: checkOutEnable ? 'green' : 'gray',
-            justifyContent: 'center',
-            alignItems: 'center',
-            alignSelf: 'center',
+            backgroundColor: checkOutEnable ? "green" : "gray",
+            justifyContent: "center",
+            alignItems: "center",
+            alignSelf: "center",
             marginTop: 50,
             borderRadius: 10,
           }}
@@ -199,10 +205,12 @@ const Home = () => {
             setCheckInEnable(false);
             setCheckOutEnable(false);
             uploadCheckOut();
-          }}>
-          <Text style={{color: '#fff'}}>Check Out</Text>
+          }}
+        >
+          <Text style={{ color: "#fff" }}>Check Out</Text>
         </TouchableOpacity>
       </View>
+      {/* <AttendanceHistory userId={userId} /> */}
     </View>
   );
 };
